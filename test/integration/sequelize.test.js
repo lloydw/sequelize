@@ -14,8 +14,6 @@ var chai = require('chai')
   , moment = require('moment')
   , Transaction = require(__dirname + '/../../lib/transaction')
   , sinon = require('sinon')
-  , babel = require('babel-core')
-  , fs = require('fs')
   , current = Support.sequelize;
 
 
@@ -251,54 +249,56 @@ describe(Support.getTestDialectTeaser('Sequelize'), function() {
       return this.sequelize.query(this.insertQuery);
     });
 
-    it('executes a query with global benchmarking option and default logger', function() {
-      var logger = sinon.spy(console, 'log');
-      var sequelize = Support.createSequelizeInstance({
-        logging: logger,
-        benchmark: true
+    describe('logging', function () {
+      it('executes a query with global benchmarking option and default logger', function() {
+        var logger = sinon.spy(console, 'log');
+        var sequelize = Support.createSequelizeInstance({
+          logging: logger,
+          benchmark: true
+        });
+
+        return sequelize.query('select 1;').then(function() {
+          expect(logger.calledOnce).to.be.true;
+          expect(logger.args[0][0]).to.be.match(/Executed \(default\): select 1; Elapsed time: \d+ms/);
+        });
       });
 
-      return sequelize.query('select 1;').then(function() {
-        expect(logger.calledOnce).to.be.true;
-        expect(logger.args[0][0]).to.be.match(/Executed \(default\): select 1; Elapsed time: \d+ms/);
+      it('executes a query with global benchmarking option and custom logger', function() {
+        var logger = sinon.spy();
+        var sequelize = Support.createSequelizeInstance({
+          logging: logger,
+          benchmark: true
+        });
+
+        return sequelize.query('select 1;').then(function() {
+          expect(logger.calledOnce).to.be.true;
+          expect(logger.args[0][0]).to.be.equal('Executed (default): select 1;');
+          expect(typeof logger.args[0][1] === 'number').to.be.true;
+        });
       });
-    });
 
-    it('executes a query with global benchmarking option and custom logger', function() {
-      var logger = sinon.spy();
-      var sequelize = Support.createSequelizeInstance({
-        logging: logger,
-        benchmark: true
+      it('executes a query with benchmarking option and default logger', function() {
+        var logger = sinon.spy(console, 'log');
+        return this.sequelize.query('select 1;', {
+          logging: logger,
+          benchmark: true
+        }).then(function() {
+          expect(logger.calledOnce).to.be.true;
+          expect(logger.args[0][0]).to.be.match(/Executed \(default\): select 1; Elapsed time: \d+ms/);
+        });
       });
 
-      return sequelize.query('select 1;').then(function() {
-        expect(logger.calledOnce).to.be.true;
-        expect(logger.args[0][0]).to.be.equal('Executed (default): select 1;');
-        expect(typeof logger.args[0][1] === 'number').to.be.true;
-      });
-    });
+      it('executes a query with benchmarking option and custom logger', function() {
+        var logger = sinon.spy();
 
-    it('executes a query with benchmarking option and default logger', function() {
-      var logger = sinon.spy(console, 'log');
-      return this.sequelize.query('select 1;', {
-        logging: logger,
-        benchmark: true
-      }).then(function() {
-        expect(logger.calledOnce).to.be.true;
-        expect(logger.args[0][0]).to.be.match(/Executed \(default\): select 1; Elapsed time: \d+ms/);
-      });
-    });
-
-    it('executes a query with benchmarking option and custom logger', function() {
-      var logger = sinon.spy();
-
-      return this.sequelize.query('select 1;', {
-        logging: logger,
-        benchmark: true
-      }).then(function() {
-        expect(logger.calledOnce).to.be.true;
-        expect(logger.args[0][0]).to.be.equal('Executed (default): select 1;');
-        expect(typeof logger.args[0][1] === 'number').to.be.true;
+        return this.sequelize.query('select 1;', {
+          logging: logger,
+          benchmark: true
+        }).then(function() {
+          expect(logger.calledOnce).to.be.true;
+          expect(logger.args[0][0]).to.be.equal('Executed (default): select 1;');
+          expect(typeof logger.args[0][1] === 'number').to.be.true;
+        });
       });
     });
 
@@ -471,6 +471,22 @@ describe(Support.getTestDialectTeaser('Sequelize'), function() {
             buffer : buffer
           });
           expect(logSql.indexOf('?')).to.equal(-1);
+      });
+    });
+
+    it('allows to pass custom class instances', function() {
+      var logSql;
+      function SQLStatement() {
+        this.values = [1, 2];
+      }
+      Object.defineProperty(SQLStatement.prototype, 'query', {
+        get: function() {
+          return 'select ? as foo, ? as bar';
+        }
+      });
+      return this.sequelize.query(new SQLStatement(), { type: this.sequelize.QueryTypes.SELECT, logging: function(s) { logSql = s; } }).then(function(result) {
+        expect(result).to.deep.equal([{ foo: 1, bar: 2 }]);
+        expect(logSql.indexOf('?')).to.equal(-1);
       });
     });
 
@@ -1070,7 +1086,7 @@ describe(Support.getTestDialectTeaser('Sequelize'), function() {
               'password authentication failed for user "bar"'
             ].indexOf(err.message.trim()) !== -1);
           } else if (dialect === 'mssql') {
-            expect(err.message).to.match(/.*ECONNREFUSED.*/);
+            expect(err.message).to.equal('Login failed for user \'bar\'.');
           } else {
             expect(err.message.toString()).to.match(/.*Access\ denied.*/);
           }
@@ -1234,18 +1250,9 @@ describe(Support.getTestDialectTeaser('Sequelize'), function() {
       expect(Project).to.exist;
     });
 
-    it('imports a dao definition from a file compiled with babel', function () {
-      var es6project = babel.transformFileSync(__dirname + '/assets/es6project.es6', {
-        presets: ['es2015']
-      }).code;
-      fs.writeFileSync(__dirname + '/assets/es6project.js', es6project);
+    it('imports a dao definition with a default export', function () {
       var Project = this.sequelize.import(__dirname + '/assets/es6project');
       expect(Project).to.exist;
-
-    });
-
-    after(function(){
-      fs.unlink(__dirname + '/assets/es6project.js');
     });
 
     it('imports a dao definition from a function', function() {

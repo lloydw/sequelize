@@ -36,16 +36,6 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
       });
     });
 
-    it('does not modify the passed arguments', function() {
-      return this.User.create({}).bind(this).then(function(user) {
-        this.options = {};
-
-        return user.getTasks(this.options);
-      }).then(function() {
-        expect(this.options).to.deep.equal({});
-      });
-    });
-
     if (current.dialect.supports.transactions) {
       it('supports transactions', function() {
         return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
@@ -624,6 +614,56 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
       }).then(function(tasks) {
         expect(tasks).to.have.length(1);
         expect(tasks[0].title).to.equal('wat');
+      });
+    });
+
+    it('using scope to set associations', function() {
+      var ItemTag = this.sequelize.define('ItemTag', {
+                      id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+                      tag_id: { type: DataTypes.INTEGER, unique: false },
+                      taggable: { type: DataTypes.STRING },
+                      taggable_id: { type: DataTypes.INTEGER, unique: false }
+      }),
+      Tag = this.sequelize.define('Tag', {
+        id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        name: DataTypes.STRING
+      }),
+      Comment = this.sequelize.define('Comment', {
+        id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        name: DataTypes.STRING
+      }),
+      Post = this.sequelize.define('Post', {
+        id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        name: DataTypes.STRING
+      });
+
+      Post.belongsToMany(Tag, {
+        through: { model: ItemTag, unique: false, scope: { taggable: 'post' } },
+        foreignKey: 'taggable_id'
+      });
+
+      Comment.belongsToMany(Tag, {
+        through: { model: ItemTag, unique: false, scope: { taggable: 'comment' } },
+       foreignKey: 'taggable_id'
+      });
+
+      return this.sequelize.sync({ force: true }).then(function() {
+        return Promise.all([
+          Post.create({ name: 'post1' }),
+          Comment.create({ name: 'comment1' }),
+          Tag.create({ name: 'tag1' })
+        ]);
+      }).bind({}).spread(function(post, comment, tag) {
+        this.post = post;
+        this.comment = comment;
+        this.tag = tag;
+        return this.post.setTags([this.tag]);
+      }).then(function() {
+        return this.comment.setTags([this.tag]);
+      }).then(function() {
+        return this.comment.getTags();
+      }).then(function(_tags) {
+        expect(_tags).to.have.length(1);
       });
     });
   });
@@ -1373,7 +1413,7 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
       this.User.belongsToMany(this.Task, { through: this.UserTasks });
       this.Task.belongsToMany(this.User, { through: this.UserTasks });
 
-      expect(Object.keys(this.UserTasks.primaryKeys)).to.deep.equal(['TaskId', 'UserId']);
+      expect(Object.keys(this.UserTasks.primaryKeys).sort()).to.deep.equal(['TaskId', 'UserId']);
     });
 
     it('keeps the primary key if it was added by the user', function() {
@@ -1426,7 +1466,7 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
         this.User.belongsToMany(this.Task, { through: this.UsersTasks });
         this.Task.belongsToMany(this.User, { through: this.UsersTasks });
 
-        expect(Object.keys(this.UsersTasks.primaryKeys)).to.deep.equal(['TaskId', 'UserId']);
+        expect(Object.keys(this.UsersTasks.primaryKeys).sort()).to.deep.equal(['TaskId', 'UserId']);
 
         return Promise.all([
           this.User.create({username: 'foo'}),

@@ -131,8 +131,8 @@ Sequelize.RANGE(Sequelize.DECIMAL)    // Defines numrange range. PostgreSQL only
 Sequelize.ARRAY(Sequelize.RANGE(Sequelize.DATE)) // Defines array of tstzrange ranges. PostgreSQL only.
 
 Sequelize.GEOMETRY                    // Spatial column.  PostgreSQL (with PostGIS) or MySQL only.
-Sequelize.GEOMETRY('POINT')           // Spatial column with geomerty type.  PostgreSQL (with PostGIS) or MySQL only.
-Sequelize.GEOMETRY('POINT', 4326)     // Spatial column with geomerty type and SRID.  PostgreSQL (with PostGIS) or MySQL only.
+Sequelize.GEOMETRY('POINT')           // Spatial column with geometry type.  PostgreSQL (with PostGIS) or MySQL only.
+Sequelize.GEOMETRY('POINT', 4326)     // Spatial column with geometry type and SRID.  PostgreSQL (with PostGIS) or MySQL only.
 ```
 
 The BLOB data type allows you to insert data both as strings and as buffers. When you do a find or findAll on a model which has a BLOB column. that data will always be returned as a buffer.
@@ -301,8 +301,8 @@ var ValidateMe = sequelize.define('foo', {
       isIPv4: true,             // checks for IPv4 (129.89.23.1)
       isIPv6: true,             // checks for IPv6 format
       isAlpha: true,            // will only allow letters
-      isAlphanumeric: true      // will only allow alphanumeric characters, so "_abc" will fail
-      isNumeric: true           // will only allow numbers
+      isAlphanumeric: true,     // will only allow alphanumeric characters, so "_abc" will fail
+      isNumeric: true,          // will only allow numbers
       isInt: true,              // checks for valid integers
       isFloat: true,            // checks for valid floating point numbers
       isDecimal: true,          // checks for any numbers
@@ -336,7 +336,7 @@ var ValidateMe = sequelize.define('foo', {
       }
     }
   }
-})
+});
 ```
 
 Note that where multiple arguments need to be passed to the built-in validation functions, the arguments to be passed must be in an array. But if a single array argument is to be passed, for instance an array of acceptable strings for `isIn`, this will be interpreted as multiple string arguments instead of one array argument. To work around this pass a single-length array of arguments, such as `[['one', 'two']]` as shown above.
